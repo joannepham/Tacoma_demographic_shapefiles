@@ -1,0 +1,95 @@
+---
+title: "ACS data retrieval"
+author: "Joanne Pham"
+date: "11/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Three packages needed to retrieve ACS data and put into shapefile format. 
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(sf)
+```
+
+Look at all variables in acs-5yr survey to confirm with notes variables on 'Indicator List.' 
+```{r}
+v18 <- load_variables(2018,
+                      "acs5",
+                      cache = TRUE)
+```
+
+
+Set up tibble with variable values, geoid, and coordinates. 
+
+MEDIAN HOUSEHOLD INCOME IN THE PAST 12 MONTHS (IN 2018 INFLATION-ADJUSTED DOLLARS) - RACE
+```{r}
+income18 <- get_acs(geography = "block group",
+                    variables = c(medincome = "B19013_001"), 
+                    state = "WA",
+                    county = "Pierce",
+                    year = 2018,
+                    geometry = TRUE)
+
+income18
+```
+
+Estimate!!Total!!Below 100 percent of the poverty level
+```{r}
+poverty18 <- get_acs(geography = "block group",
+                    variables = c(percentpov = "B06012_002"), 
+                    state = "WA",
+                    county = "Pierce",
+                    year = 2018,
+                    geometry = TRUE)
+
+poverty18
+```
+
+Estimate!!Total!! - EDUCATIONAL ATTAINMENT BY EMPLOYMENT STATUS FOR THE POPULATION 25 TO 64 YEARS
+```{r}
+unemployment18 <- get_acs(geography = "block group",
+                    variables = c(unemployed = "B23006_001"), 
+                    state = "WA",
+                    county = "Pierce",
+                    year = 2018,
+                    geometry = TRUE)
+
+unemployment18
+```
+
+Race: Percentage of people who are not white non-Hispanic
+```{r}
+race18 <- get_acs(geography = "block group",
+                    variables = c(race = "B02001_001"), 
+                    state = "WA",
+                    county = "Pierce",
+                    year = 2018,
+                    geometry = TRUE)
+
+race18
+```
+
+Estimate!!Total - RELATIONSHIP BY HOUSEHOLD TYPE (INCLUDING LIVING ALONE) FOR THE POPULATION 65 YEARS AND OVER
+```{r}
+race18 <- get_acs(geography = "block group",
+                    variables = c(race = "B02001_001"), 
+                    state = "WA",
+                    county = "Pierce",
+                    year = 2018,
+                    geometry = TRUE)
+
+race18
+```
+
+Set up as shapefile.
+```{r}
+head(income18)
+
+st_write(income18, "median_hh_income.shp")
+```
+
