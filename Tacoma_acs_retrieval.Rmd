@@ -1,0 +1,130 @@
+---
+title: "ACS data retrieval"
+author: "Joanne Pham"
+date: "11/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Three packages needed to retrieve ACS data and put into shapefile format. 
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(sf)
+```
+
+Look at all variables in acs-5yr survey to confirm with notes variables on 'Indicator List.' 
+```{r}
+census_api_key("5c21716c9afca860e0cbe0af36ce624318258e30",
+               install = TRUE,
+               overwrite = TRUE)
+
+v19 <- load_variables(2019,
+                      "acs5",
+                      cache = TRUE)
+```
+
+Set up variables list.  
+```{r}
+vars <- c(
+          "C17002_008", ## RATIO OF INCOME TO POVERTY LEVEL IN THE PAST 12 MONTHS: #               Estimate!!Total:!!2.00 and over
+          "C17002_001", # Estimate!!Total:
+          "B03002_003", ## HISPANIC OR LATINO ORIGIN BY RACE: # Estimate!!Total:!!Hispanic or Latino:!!White alone
+          "B03002_001", # Estimate!!Total:
+          "B23025_007", ## EMPLOYMENT STATUS FOR THE POPULATION 16 YEARS AND OLDER: # Estimate!!Total:!!Not in labor force
+          "B23025_001", # Estimate!!Total:
+          "B01001_001", ## SEX BY AGE: # Estimate!!Total:
+          "B01001_020", # Estimate!!Total:!!Male:!!65 and 66 years
+          "B01001_021", # Estimate!!Total:!!Male:!!67 to 69 years
+          "B01001_022", # Estimate!!Total:!!Male:!!70 to 74 years
+          "B01001_023", # Estimate!!Total:!!Male:!!75 to 79 years
+          "B01001_024", # Estimate!!Total:!!Male:!!80 to 84 years
+          "B01001_025", # Estimate!!Total:!!Male:!!85 years and over
+          "B01001_044", # Same as above, except female
+          "B01001_045",
+          "B01001_046",
+          "B01001_047",
+          "B01001_048",
+          "B01001_049",
+          "B01001_003", # Estimate!!Total:!!Male:!!Under 5 years
+          "B01001_004", # Estimate!!Total:!!Male:!!5 to 9 years
+          "B01001_005", # Estimate!!Total:!!Male:!!10 to 14 years
+          "B01001_006", # Estimate!!Total:!!Male:!!15 to 17 years
+          "B01001_027", # Same as avove, except female
+          "B01001_028",
+          "B01001_029",
+          "B01001_030")
+```
+
+
+Connect to the ACS website with the necessary filters.
+```{r} 
+acs_connection <- get_acs(geography = "block group", 
+                              variables = vars, 
+                              state = "WA",
+                              county = "Pierce",
+                              year = 2019,
+                              geometry = TRUE)
+```
+
+Specify format of tibble for the final results.
+```{r}
+acs_format <- acs_connection %>% 
+   select(GEOID, NAME, variable, estimate, geometry) %>% # without selection, it will include measure of error
+                              spread(variable, estimate) %>% # formats a pair of key:value columns into a set of tidy columns 
+                              rowwise()  # computes data a row at a time
+```
+
+Select the data tables of interest using the variables specified earlier. Transform through operations to get required final results.
+```{r}
+acs_vars <- acs_format %>% 
+     mutate(pct_poverty = (C17002_001 - C17002_008) / C17002_001 * 100, # percent of population with ratio of income to poverty level in the past 2 months below 2.00
+            pct_poc = (B03002_001 - B03002_003) / B03002_001 * 100, # percent of population with race other than white
+            pct_unemployed = B23025_007 / B23025_001 * 100, # percent of population not in employment 16 years and older
+            dep_ratio = sum(B01001_020, B01001_021, B01001_022, B01001_023, B01001_024, B01001_025, # age-population ratio of the population above 65 and under 18 years older to the working-age population
+                            B01001_044, B01001_045, B01001_046, B01001_047, B01001_048, B01001_049,
+                            B01001_003, B01001_004, B01001_005, B01001_006, B01001_027, B01001_028,
+                            B01001_029, B01001_030) / (B01001_001 - sum(B01001_020, B01001_021,
+                                                                        B01001_022, B01001_023,
+                                                                        B01001_024, B01001_025,
+                                                                        B01001_044, B01001_045,
+                                                                        B01001_046, B01001_047,
+                                                                        B01001_048, B01001_049,
+                                                                        B01001_003, B01001_004,
+                                                                        B01001_005, B01001_006,
+                                                                        B01001_027, B01001_028,
+                                                                        B01001_029, B01001_030)) * 100,
+
+            tot_pop = B01001_001) # total population
+    
+```
+
+Set up format for final data table. 
+```{r}
+acs_final <- acs_vars %>% 
+    select(GEOID,
+           NAME,
+           pct_poverty,
+           pct_poc,
+           pct_unemployed,
+           dep_ratio,
+           tot_pop,
+           geometry)
+```
+
+Turn into shapefile. 
+```{r}
+head(acs_final) # final check to make sure data table fits expecations
+
+
+shp = "Pierce_county_5yr_acs_2019.shp"
+
+st_write(acs_final, shp,
+         append = FALSE)
+
+```
+
+
